@@ -194,10 +194,10 @@ python test.py
 ## Technical Notes
 
 ### Why Not YOLO?
-YOLO is significantly faster but this project was specifically about learning how two-stage detection works. Understanding the RPN, anchor boxes, and ROI pooling in Faster R-CNN was the goal — not achieving maximum inference speed.
+YOLO is significantly faster but this project was specifically about learning how two-stage detection works. Understanding the RPN, anchor boxes, and ROI pooling in Faster R-CNN was the goal not achieving maximum inference speed.
 
 ### Why 3 Classes?
-Binary mask/no-mask misses a real common case — mask worn with nose exposed. Three classes gives more actionable output and reflects what you actually see in practice.
+Binary mask/no-mask misses a real common case mask worn with nose exposed. Three classes gives more actionable output and reflects what you actually see in practice.
 
 ### Why No Class Weights?
-We used COCO-pretrained transfer learning as the primary strategy for handling imbalance. The minority class `mask_weared_incorrect` still underperforms — this is acknowledged as a known limitation. The real fix is more data, not reweighting.
+We used COCO-pretrained transfer learning as the primary strategy for handling imbalance. The minority class `mask_weared_incorrect` still underperforms this is acknowledged as a known limitation. The real fix is more data, not reweighting.
