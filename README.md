@@ -4,6 +4,8 @@ A face mask detection system built with Faster R-CNN to classify three categorie
 
 ---
 
+![Image](https://github.com/user-attachments/assets/65e52fc7-c6bc-47d8-a4ed-4f4edcbf76a1)
+
 ## Results
 
 | Metric | Value |
@@ -33,6 +35,8 @@ with_mask:              3,232 (79.37%)
 without_mask:             717 (17.61%)
 mask_weared_incorrect:    123 ( 3.02%)
 ```
+<img width="989" height="590" alt="Image" src="https://github.com/user-attachments/assets/1fdec436-1bbc-47d8-8051-2e3b45ae3810" />
+
 
 **Note:** The dataset has a natural class imbalance. The minority class `mask_weared_incorrect` (3%) is the weakest performer in the model. We relied on COCO-pretrained transfer learning to partially handle this, but collecting more examples of this class is the proper long-term fix.
 
@@ -88,6 +92,9 @@ Augmentation was important here because 853 images is a very small dataset. Thes
 - No data leakage between sets
 
 ---
+
+
+
 
 ## Training Curve
 
