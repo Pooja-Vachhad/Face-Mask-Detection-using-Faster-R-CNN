@@ -1,12 +1,10 @@
 # Face Mask Detection with Faster R-CNN
 
-Real-time face mask detection system using Faster R-CNN to classify proper mask wearing, no mask, or improper mask wearing. Built for safety-critical applications where **accuracy matters more than speed**.
-
-![Image](https://github.com/user-attachments/assets/65e52fc7-c6bc-47d8-a4ed-4f4edcbf76a1)
+A face mask detection system built with Faster R-CNN to classify three categories — proper mask wearing, no mask, and incorrectly worn mask. This was built as a **learning project** to understand two-stage object detection on a small real-world dataset.
 
 ---
 
-##  Results
+## Results
 
 | Metric | Value |
 |--------|-------|
@@ -19,7 +17,7 @@ Real-time face mask detection system using Faster R-CNN to classify proper mask 
 
 ---
 
-##  Dataset Information
+## Dataset Information
 
 **Source:** [Kaggle Face Mask Detection Dataset](https://www.kaggle.com/datasets/andrewmvd/face-mask-detection)
 
@@ -30,15 +28,13 @@ Real-time face mask detection system using Faster R-CNN to classify proper mask 
 
 ### Class Distribution
 
-<img width="989" height="590" alt="Image" src="https://github.com/user-attachments/assets/1fdec436-1bbc-47d8-8051-2e3b45ae3810" />
-
 ```
 with_mask:              3,232 (79.37%)
 without_mask:             717 (17.61%)
 mask_weared_incorrect:    123 ( 3.02%)
 ```
 
-**Note:** Class imbalance reflects real-world distribution where most people wear masks correctly. Model trained with transfer learning from COCO-pretrained weights handles this imbalance without manual rebalancing.
+**Note:** The dataset has a natural class imbalance. The minority class `mask_weared_incorrect` (3%) is the weakest performer in the model. We relied on COCO-pretrained transfer learning to partially handle this, but collecting more examples of this class is the proper long-term fix.
 
 ---
 
@@ -46,121 +42,107 @@ mask_weared_incorrect:    123 ( 3.02%)
 
 | Decision | Reasoning |
 |----------|-----------|
-| **Accuracy over Speed** | For safety/compliance applications, false negatives are costly. Chose precision over real-time performance. |
-| **ResNet50-FPN Backbone** | Feature Pyramid Network handles faces at multiple scales (close-up vs distant). |
-| **Transfer Learning** | COCO pretrained weights reduce training time and improve generalization on small dataset. |
-| **Proven Architecture** | Extensively researched, well-documented, easier to debug than newer methods. |
-
-
+| **Two-stage detector** | Chosen specifically to learn and understand how two-stage object detection works — RPN + classification head |
+| **ResNet50-FPN backbone** | FPN handles objects at multiple scales well. However in hindsight, ResNet18-FPN would have been a better fit for a dataset this small — less complexity, less overfitting risk |
+| **Transfer learning from COCO** | Pretrained weights reduced training time and helped the model generalize despite the small dataset |
+| **Proven architecture** | Well documented, easier to debug and understand compared to newer methods |
 
 ---
 
 ## Training Configuration
 
 ### Key Hyperparameters
-- **Batch Size:** 4 (limited by GPU memory - 6GB VRAM)
+
+- **Batch Size:** 4 (limited by GPU memory — 6GB VRAM)
 - **Learning Rate:** 5e-4 with ReduceLROnPlateau scheduler
 - **Optimizer:** Adam
 - **Early Stopping:** Patience of 7 epochs
 - **Random Seed:** 42 (for reproducibility)
 
-### Data Augmentation (Critical for Small Dataset!)
+### Data Augmentation
 ```python
-RandomHorizontalFlip(0.5)      # Faces can be mirrored
-ColorJitter(brightness=0.2,     # Handle different lighting
-           contrast=0.2, 
-           saturation=0.1)
+RandomHorizontalFlip(0.5)        # Faces can appear mirrored
+ColorJitter(brightness=0.2,      # Handle different lighting conditions
+            contrast=0.2,
+            saturation=0.1)
 ```
+Augmentation was important here because 853 images is a very small dataset. These transforms increase effective variety without collecting new data.
 
 ### Why These Choices?
 
 **Batch Size 4:**
-- Tested batch sizes 2, 4, 8
-- Size 8 caused GPU OOM errors
-- Size 2 led to unstable gradients
-- **4 was the sweet spot**
+- Tested 2, 4, and 8
+- Size 8 caused GPU out-of-memory errors
+- Size 2 caused unstable gradients
+- 4 was the stable middle ground
 
 **Learning Rate 5e-4:**
-- Tested: 1e-3 (too fast, diverged), 5e-4 (stable), 1e-4 (too slow)
-- Scheduler reduced to 2.5e-4 at epoch 12 when validation plateaued
+- 1e-3 — loss diverged (jumped around, never settled)
+- 5e-4 — stable convergence
+- 1e-4 — converged but very slowly
+- Scheduler automatically reduced to 2.5e-4 at epoch 12
 
 **70/15/15 Split:**
-- Ensures proper held-out test set
-- Fixed seed guarantees reproducibility
+- Separate test set ensures unbiased final evaluation
+- Fixed seed guarantees same split every run
 - No data leakage between sets
 
 ---
 
-##  Training Curve
+## Training Curve
 
+### What Happened During Training
 
-
-### What Happened During Training:
-
-**Epochs 1-8:** Model learning rapidly, both train and val loss decreasing  
-**Epoch 8:** Best validation loss (0.2803) achieved  
-**Epochs 9-11:** Validation loss starts increasing while train loss keeps dropping → **Overfitting begins**  
-**Epoch 12:** Learning rate reduced from 5e-4 to 2.5e-4 (scheduler triggered)  
-**Epochs 12-15:** No improvement despite lower learning rate  
-**Epoch 15:** Early stopping triggered (patience exhausted)
+**Epochs 1–8:** Both train and val loss decreasing steadily
+**Epoch 8:** Best validation loss achieved (0.2803)
+**Epochs 9–11:** Val loss starts rising while train loss keeps dropping → overfitting begins
+**Epoch 12:** Scheduler triggers, LR reduced from 5e-4 to 2.5e-4
+**Epochs 12–15:** No improvement even with lower LR
+**Epoch 15:** Early stopping triggered
 
 ---
 
-## Known Limitations & Overfitting Analysis
+## Overfitting Analysis
 
-### Evidence of Overfitting
+### Evidence
 
 ```
-Train Loss: 0.0959  ← Very low
+Train Loss: 0.0959  ← very low
 Val Loss:   0.3171  ← 3.3x higher
 ```
 
-**This gap indicates the model memorized training data rather than learning generalizable features.**
+The model memorized the training data rather than learning features that generalize.
+
+### Root Causes
+
+1. **Dataset too small** — 853 images is not enough variety for a model this size. Object detectors typically need 5,000+ images
+2. **Model too complex** — ResNet50 has too many parameters for this dataset. ResNet18 would have been a better backbone choice
+3. **Limited data diversity** — mostly frontal faces, similar lighting, similar contexts
 
 ### Where the Model Fails
 
-1. **Profile Views & Unusual Angles**
-   - Training data mostly frontal faces
-   - Struggles with side profiles, tilted heads
-   
-2. **False Positives on Partial Faces**
-   - Sometimes detects "masks" on ears, hair, or background
-   - Overconfident even when wrong (scores >0.85)
-   
-3. **Occlusions**
-   - Hands covering face confuse the model
-   - Sunglasses + mask = poor predictions
-
-### Why This Happened
-
-1. **Small Dataset (853 images)**
-   - Not enough variety in angles, lighting, demographics
-   - Modern object detectors typically need 5,000+ images
-   
-2. **Class Imbalance**
-   - Only 3% "mask_weared_incorrect" examples
-   - Model underperforms on this minority class
-   
-3. **Limited Diversity**
-   - Dataset lacks edge cases (profile views, occlusions, poor lighting)
-   - All images from similar sources/contexts
-
-### How to Fix
-
-**Short-term (within current constraints):**
-- Add dropout layers for regularization
-- More aggressive augmentation (rotations, crops, synthetic occlusions)
-- Reduce model complexity (use ResNet18 instead of ResNet50)
-
-**Long-term (ideal solution):**
-- Collect 5,000+ diverse images
-- Include edge cases: profiles, occlusions, varied demographics
-- Use ensemble methods or test-time augmentation
-- Try newer architectures (Cascade R-CNN, DETR)
+- **Unusual angles** — trained mostly on frontal faces, struggles with side profiles and tilted heads
+- **False positives** — sometimes detects masks on ears, hair, or background objects
+- **Occlusions** — hands covering face or sunglasses combined with mask confuse the model
+- **Minority class** — `mask_weared_incorrect` has very few examples, model underperforms on it
 
 ---
 
-##  Installation
+## How to Improve
+
+### Short-term
+- Replace ResNet50 with ResNet18 backbone — reduces model complexity and overfitting risk
+- Add dropout layers for regularization
+- More aggressive augmentation (rotations, perspective changes, synthetic occlusions)
+
+### Long-term
+- Collect 5,000+ diverse images with varied angles, lighting, and demographics
+- Add focal loss to better handle the minority class imbalance
+- Once dataset is larger, explore more powerful architectures
+
+---
+
+## Installation
 
 ```bash
 git clone https://github.com/Pooja-Vachhad/face-mask-detection.git
@@ -168,87 +150,47 @@ cd face-mask-detection
 pip install -r requirements.txt
 ```
 
+---
 
-##  Usage
+## Usage
 
-
-
-### 1. Train Model
+### Train
 ```bash
 python train.py
 ```
-- Trains for max 30 epochs with early stopping
-- Saves best model to `best_model.pth`
-- Takes ~1.5 hours on T4 GPU
+- Max 30 epochs with early stopping
+- Best model saved to `best_model.pth`
+- ~1.5 hours on T4 GPU
 
-### 3. Run Inference
+### Inference
 ```bash
 python test.py
 ```
 
-
-
-
 ---
 
-##  What I Learned
+## What I Learned
 
-### Technical Lessons
-1. **Small datasets require aggressive regularization** - Data augmentation was critical
-2. **Transfer learning is powerful** - COCO pretraining gave huge boost despite different domain
-3. **Early stopping prevents overfitting** - Without it, model would have overfit even more
-4. **Validation curves tell the truth** - Train loss alone is misleading
+### Technical
+1. **Model size must match dataset size** — ResNet50 was overkill for 853 images
+2. **Transfer learning helps a lot on small datasets** — COCO pretraining gave a strong starting point
+3. **Early stopping is necessary but not sufficient** — it limits overfitting but doesn't fix the root cause
+4. **Train loss alone is misleading** — always watch validation loss
 
-### Engineering Lessons
-1. **Start simple, iterate** - Tried complex augmentation first, scaled back to what worked
-2. **Monitor both metrics** - High mAP doesn't mean deployment-ready
-3. **Test on edge cases** - Model works on "easy" test set but fails on real-world cases
-4. **Document limitations honestly** - Better to acknowledge weaknesses than hide them
-
----
-
-## Future Improvements
-
-If given more time/resources:
-
-### Data Collection
-- Gather 5,000+ images with:
-  - Diverse demographics (age, ethnicity)
-  - Various angles (frontal, profile, tilted)
-  - Different lighting (indoor, outdoor, low-light)
-  - Edge cases (occlusions, accessories)
-
-### Model Improvements
-- Try Cascade R-CNN (multi-stage refinement)
-- Experiment with DETR (transformer-based)
-- Add focal loss to handle class imbalance
-- Implement test-time augmentation
-
-### Deployment
-- Build REST API with FastAPI
-- Add real-time video processing
-- Create web demo with Streamlit
-- Containerize with Docker
+### General
+1. **Start with the simplest model that makes sense** — don't go heavy by default
+2. **Document what went wrong honestly** — it shows deeper understanding than hiding problems
+3. **mAP on test set ≠ production ready** — edge cases matter in real deployment
 
 ---
 
 ## Technical Notes
 
 ### Why Not YOLO?
-- YOLO is faster (~30 FPS vs ~15 FPS)
-- Faster R-CNN has higher precision for small faces
-- For compliance monitoring, accuracy > speed
-- False negatives (missed unmasked people) are costly
+YOLO is significantly faster but this project was specifically about learning how two-stage detection works. Understanding the RPN, anchor boxes, and ROI pooling in Faster R-CNN was the goal — not achieving maximum inference speed.
 
 ### Why 3 Classes?
-- "Mask worn incorrectly" (nose exposed) is common real-world issue
-- Provides actionable feedback vs binary classification
-- Helps identify compliance vs safety issues
+Binary mask/no-mask misses a real common case — mask worn with nose exposed. Three classes gives more actionable output and reflects what you actually see in practice.
 
 ### Why No Class Weights?
-- Tested weighted loss for class imbalance
-- Transfer learning from COCO already handles imbalance well
-- No significant improvement (<1% mAP gain)
-- Added complexity not worth minimal benefit
-
----
+We used COCO-pretrained transfer learning as the primary strategy for handling imbalance. The minority class `mask_weared_incorrect` still underperforms — this is acknowledged as a known limitation. The real fix is more data, not reweighting.
